@@ -19,7 +19,7 @@ router.get('/task/:id', async function(req, res) {
       if (req.params.id) {
         const data = await Task.findOne({ _id: req.params.id });
         if (data) {
-          res.render('task', { data: data, roomId: data.id});
+          res.render('task', {content: data.content, roomId: data.id});
         } else {
           res.render('error');
         }

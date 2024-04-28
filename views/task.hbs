@@ -1,10 +1,26 @@
 <div>
   <div class="row">
     <div class="col-md-8">
-      <textarea id="code-screen"></textarea>
+      <textarea id="code-screen">{{content}}</textarea>
     </div>
     <div class="col-md-4" id="chatbox">
       <div class="panel panel-primary">
+        <div id="video-container">
+          <video autoplay id="second-video"></video>
+          <video autoplay id="my-video" muted="true"></video>
+          <div id="step2">
+            <p>Your ID: <span id="my-id">...</span></p>
+            <div class="form-inline">
+              <input type="text" class="form-control" placeholder="Call User Id..." id="callto-id">
+              <a href="#" class="btn btn-sm btn-success" id="make-call">Call</a>
+            </div>
+          </div>
+          <div id="step3">
+            <p>Talk to <span id="second-id">...</span>
+              <a href="#" class="btn btn-sm btn-danger" id="end-call">End Call</a>
+            </p>
+          </div>
+        </div>
         <div class="panel-heading">
           CHAT ROOM
           <span class="pull-right" id="chatbox-username">
@@ -30,26 +46,35 @@
     </div>
   </div>
 </div>
+
 <input type="hidden" value="{{roomId}}" id="roomId">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.25.0/codemirror.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.25.0/mode/javascript/javascript.min.js"></script>
 
 <script src="/plugins/ot/ot.js"></script>
 <script src="/socket.io/socket.io.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
   var EditorClient = ot.EditorClient;
   var SocketIOAdapter = ot.SocketIOAdapter;
   var CodeMirrorAdapter = ot.CodeMirrorAdapter;
-
   var socket = io.connect('http://localhost:3000');
   var editor = CodeMirror.fromTextArea(document.getElementById("code-screen"), {
     lineNumbers: true,
-    theme: "monokai"
+    theme: "monokai",
+    matchBrackets: true, 
+    autoCloseBrackets: true,
+    indentWithTabs: true,
+    smartIndent: true
   });
 
+  var code = $('#code-screen').val();
   var cmClient;
   function init(str, revision, clients, serverAdapter) {
-    editor.setValue(str);
+    if(!code) {
+      editor.setValue(str);
+    }
+    
     cmClient = window.cmClient = new EditorClient(
       revision, clients, serverAdapter, new CodeMirrorAdapter(editor)
     );
@@ -91,4 +116,89 @@
     $('#chatbox-listMessages').append(userMessage(data.username, data.message));
   });
   
+$(function(){
+    var peer = new Peer(); // Initialize PeerJS
+
+    peer.on('open', function(){
+        $('#my-id').text(peer.id);
+    });
+
+    peer.on('call', function(call){
+        // Answer the call automatically (instead of prompting user) for demo purposes
+        navigator.mediaDevices.getUserMedia({audio: true, video: true})
+        .then(function(stream) {
+            call.answer(stream); // Answer the call with the user's stream
+            step3(call);
+        })
+        .catch(function(err) {
+            console.error('Failed to get local stream', err);
+        });
+    });
+  
+    peer.on('error', function(err){
+        alert(err.message);
+        // Return to step 2 if error occurs
+        step2();
+    });
+
+    $('#make-call').click(function(){
+        // Initiate a call!
+        navigator.mediaDevices.getUserMedia({audio: true, video: true})
+        .then(function(stream) {
+            var call = peer.call($('#callto-id').val(), stream);
+            step3(call);
+        })
+        .catch(function(err) {
+            console.error('Failed to get local stream', err);
+        });
+    });
+
+    $('#end-call').click(function(){
+        if (window.existingCall) {
+            window.existingCall.close(); // Close the existing call
+            step2();
+        }
+    });
+
+    function step1() {
+        // Get user media stream
+        navigator.mediaDevices.getUserMedia({audio: true, video: true})
+        .then(function(stream) {
+            console.log("stream successfull");
+            $('#my-video').prop('srcObject', stream); // Set the user's video stream
+            window.localStream = stream;
+            step2();
+        })
+        .catch(function(err) {
+            console.error('Failed to get local stream', err);
+        });
+    }
+
+    function step2 () {
+        $('#step3').hide();
+        $('#step2').show();
+    }
+
+    function step3 (call) {
+        // Hang up on an existing call if present
+        if (window.existingCall) {
+            window.existingCall.close();
+        }
+        // Wait for stream on the call, then set peer video display
+        call.on('stream', function(stream){
+            $('#second-video').prop('srcObject', stream); // Set the peer's video stream
+        });
+        // UI stuff
+        window.existingCall = call;
+        $('#second-id').text(call.peer);
+        call.on('close', step2);
+        $('#step2').hide();
+        $('#step3').show();
+    }
+
+    step1(); // Start by getting user media
+});
+
+  
+
 </script>

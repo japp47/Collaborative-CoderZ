@@ -21,6 +21,7 @@
     "ot": "github:Operational-Transformation/ot.js",
     "passport": "^0.3.2",
     "passport-local": "^1.0.0",
+    "peerjs": "^1.5.2",
     "socket.io": "^1.7.4"
   }
 }
